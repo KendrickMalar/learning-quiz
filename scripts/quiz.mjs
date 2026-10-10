@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, m
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SLUG_RE, validateDeck, pickQuestions, countAvailable, judge } from './core.mjs';
-import { parseLog } from './stats.mjs';
+import { parseLog, lastTouched, byLastTouched, dayKey } from './stats.mjs';
 
 const ROOT = process.env.QUIZ_ROOT ?? join(dirname(fileURLToPath(import.meta.url)), '..');
 const QUIZ_DIR = join(ROOT, 'quizzes');
@@ -29,8 +29,8 @@ function readDeckFile(slug) {
 
 // 読めないときは理由の文字列を投げる
 function readValidDeck(slug) {
-  if (!SLUG_RE.test(slug ?? '')) throw new Error(`セット名が不正です: ${slug ?? '（なし）'}`);
-  if (!existsSync(join(QUIZ_DIR, `${slug}.json`))) throw new Error(`問題セットが見つかりません: ${slug}（list で一覧を確認してください）`);
+  if (!SLUG_RE.test(slug ?? '')) throw new Error(`セッション名が不正です: ${slug ?? '（なし）'}`);
+  if (!existsSync(join(QUIZ_DIR, `${slug}.json`))) throw new Error(`セッションが見つかりません: ${slug}（list で一覧を確認してください）`);
   let deck;
   try {
     deck = readDeckFile(slug);
@@ -56,8 +56,9 @@ function readLog() {
 
 function list() {
   const slugs = deckSlugs();
-  if (slugs.length === 0) return console.log('問題セットがありません');
+  if (slugs.length === 0) return console.log('セッションがありません');
   const entries = readLog();
+  const rows = [];
   for (const slug of slugs) {
     let deck;
     try {
@@ -66,7 +67,11 @@ function list() {
       console.error(`（飛ばしました）${e.message}`);
       continue;
     }
-    console.log(`${slug}\t${deck.title}\t出題可能 ${countAvailable(deck, slug, entries)} / 全 ${deck.questions.length} 問`);
+    rows.push({ slug, deck, lastTouched: lastTouched({ ...deck, slug }, entries) });
+  }
+  for (const { slug, deck, lastTouched: touched } of rows.sort(byLastTouched)) {
+    const last = touched ? dayKey(new Date(touched)) : '—';
+    console.log(`${slug}\t${deck.title}\t復習 ${countAvailable(deck, slug, entries)} / 全 ${deck.questions.length} 問\t最終 ${last}`);
   }
 }
 
@@ -74,9 +79,15 @@ function pick(slug, nArg) {
   const deck = loadDeck(slug);
   const n = nArg === undefined ? 5 : Number(nArg);
   if (!Number.isInteger(n) || n < 1) fail(`問題数は1以上の整数にしてください: ${nArg}`);
-  const questions = pickQuestions(deck, slug, readLog(), { n });
+  const entries = readLog();
+  const questions = pickQuestions(deck, slug, entries, { n });
+  const due = countAvailable(deck, slug, entries);
   const result = { deck: slug, title: deck.title, questions };
-  if (questions.length === 0) result.message = '今日出せる問題はありません（すべて復習待ち）';
+  if (due < questions.length) {
+    result.message = due === 0
+      ? '復習の時期が来た問題はありません。時期前の問題を出します'
+      : `復習の時期が来た問題は ${due} 問です。残りは時期前の問題を出します`;
+  }
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -123,7 +134,7 @@ function validate() {
   }
   if (!ok) process.exit(1);
   writeFileSync(join(QUIZ_DIR, 'index.json'), JSON.stringify(index, null, 2) + '\n');
-  console.log(`OK: ${index.length} セット`);
+  console.log(`OK: ${index.length} セッション`);
 }
 
 const [command, ...args] = process.argv.slice(2);

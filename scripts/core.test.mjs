@@ -36,6 +36,13 @@ test('validateDeck は不正な形式を弾く', () => {
   }
 });
 
+test('validateDeck は updated が日付でなければ弾き、日付なら通す', () => {
+  for (const bad of ['yesterday', '2026-13-01', '2026/10/10', 20261010]) {
+    assert.ok(validateDeck({ ...deckOf(question('q1')), updated: bad }).some((e) => e.includes('updated')), String(bad));
+  }
+  assert.deepEqual(validateDeck({ ...deckOf(question('q1')), updated: '2026-10-10' }), []);
+});
+
 test('questionStatus: 未回答は new', () => {
   assert.equal(questionStatus([], NOW), 'new');
 });
@@ -62,11 +69,18 @@ test('questionStatus: 記録の並び順に依存しない', () => {
   assert.equal(questionStatus([entry('q', HOUR, false), entry('q', 2 * DAY, true)], NOW), 'review');
 });
 
-test('pickQuestions は 要復習 → 期限切れ → 未回答 の順で、待機中を出さない', () => {
+test('pickQuestions は 要復習 → 期限切れ → 未回答 → 時期前 の順に出す', () => {
   const deck = deckOf(question('new'), question('due'), question('review'), question('wait'));
   const entries = [entry('review', HOUR, false), entry('due', 2 * DAY, true), entry('wait', HOUR, true)];
   const picked = pickQuestions(deck, 'd', entries, { now: NOW, rng: () => 0 });
-  assert.deepEqual(picked.map((q) => q.id), ['review', 'due', 'new']);
+  assert.deepEqual(picked.map((q) => q.id), ['review', 'due', 'new', 'wait']);
+});
+
+test('pickQuestions は時期前の問題を次の復習日が近い順に出す', () => {
+  const deck = deckOf(question('far'), question('near'));
+  const entries = [entry('far', 5 * DAY, true), entry('far', HOUR, true), entry('near', HOUR, true)];
+  const picked = pickQuestions(deck, 'd', entries, { now: NOW });
+  assert.deepEqual(picked.map((q) => q.id), ['near', 'far']);
 });
 
 test('pickQuestions は n 問までに絞る', () => {
