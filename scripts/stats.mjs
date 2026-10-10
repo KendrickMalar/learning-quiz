@@ -16,20 +16,33 @@ export function parseLog(text) {
   return entries;
 }
 
-function dayKey(date) {
+export function dayKey(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
-// decks: [{ slug, title, questions }]。日付は実行環境の時刻帯で区切る。
+// 最後に触った日時（ISO 文字列）。最後に解いた日時と、問題を足した日（updated）の新しいほう。どちらもなければ null
+// 最後に触った順（新しい順）。null は最後
+export const byLastTouched = (a, b) => (b.lastTouched ?? '').localeCompare(a.lastTouched ?? '');
+
+export function lastTouched(deck, entries) {
+  const times = entries.filter((e) => e.deck === deck.slug).map((e) => Date.parse(e.ts));
+  if (deck.updated) times.push(Date.parse(`${deck.updated}T00:00:00Z`));
+  return times.length ? new Date(Math.max(...times)).toISOString() : null;
+}
+
+// decks: [{ slug, title, questions, updated? }]。日付は実行環境の時刻帯で区切る。
 export function summarize(decks, entries, { days = 14, now = new Date() } = {}) {
   const perDeck = decks.map((deck) => {
     const mine = entries.filter((e) => e.deck === deck.slug);
     const correct = mine.filter((e) => e.correct).length;
-    return { slug: deck.slug, title: deck.title, answered: mine.length, correct, rate: mine.length ? correct / mine.length : null };
-  });
+    return {
+      slug: deck.slug, title: deck.title, answered: mine.length, correct,
+      rate: mine.length ? correct / mine.length : null, lastTouched: lastTouched(deck, entries),
+    };
+  }).sort(byLastTouched);
 
   const daily = [];
   for (let i = days - 1; i >= 0; i--) {

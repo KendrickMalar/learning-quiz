@@ -29,7 +29,7 @@
 <main>
   <h1>学習クイズの成績</h1>
   <p class="note" id="summary">読み込み中…</p>
-  <h2>セット別</h2>
+  <h2>セッション（最後に触った順）</h2>
   <div id="decks"></div>
   <h2>直近14日</h2>
   <div id="daily"></div>
@@ -84,9 +84,9 @@
     const entries = parseLog((await fetchText('results/log.jsonl')) ?? '');
     const { perDeck, daily, weak } = summarize(decks, entries);
 
-    document.getElementById('summary').textContent = `${decks.length} セット・回答 ${entries.length} 件`;
+    document.getElementById('summary').textContent = `${decks.length} セッション・回答 ${entries.length} 件`;
     fill('decks', perDeck.map((d) =>
-      row(d.title, `${pct(d.correct, d.answered)}（${d.correct}/${d.answered}）`, d.answered ? d.rate : null)), 'まだ問題セットがありません');
+      row(d.title, `${pct(d.correct, d.answered)}（${d.correct}/${d.answered}）`, d.answered ? d.rate : null)), 'まだセッションがありません。Claude Code で「この本の問題作って」と言うと作れます');
     const max = Math.max(1, ...daily.map((d) => d.answered));
     fill('daily', daily.slice().reverse().map((d) =>
       row(d.date, d.answered ? `${d.answered}問・正答率 ${pct(d.correct, d.answered)}` : '0問', d.answered / max)), '');

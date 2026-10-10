@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLog, summarize } from './stats.mjs';
+import { parseLog, summarize, lastTouched } from './stats.mjs';
 
 test('parseLog は空行・壊れた行・欠けた項目を読み飛ばす', () => {
   const text = [
@@ -25,12 +25,20 @@ const DECKS = [
 ];
 const e = (deck, id, correct, ts = '2026-10-10T03:00:00.000Z') => ({ ts, deck, id, correct });
 
-test('summarize: セットごとの回答数と正答率', () => {
-  const { perDeck } = summarize(DECKS, [e('a', 'q1', true), e('a', 'q2', false), e('a', 'q1', true)], { now: NOW });
+test('summarize: セッションごとの回答数と正答率を、最後に触った順に並べる', () => {
+  const decks = [{ ...DECKS[1], updated: '2026-10-01' }, DECKS[0]];
+  const { perDeck } = summarize(decks, [e('a', 'q1', true), e('a', 'q2', false), e('a', 'q1', true)], { now: NOW });
   assert.deepEqual(perDeck, [
-    { slug: 'a', title: 'セットA', answered: 3, correct: 2, rate: 2 / 3 },
-    { slug: 'b', title: 'セットB', answered: 0, correct: 0, rate: null },
+    { slug: 'a', title: 'セットA', answered: 3, correct: 2, rate: 2 / 3, lastTouched: '2026-10-10T03:00:00.000Z' },
+    { slug: 'b', title: 'セットB', answered: 0, correct: 0, rate: null, lastTouched: '2026-10-01T00:00:00.000Z' },
   ]);
+});
+
+test('lastTouched は最後に解いた日時と updated の新しいほうを返す', () => {
+  const deck = { slug: 'a', updated: '2026-10-07', questions: [] };
+  assert.equal(lastTouched(deck, [e('a', 'q1', true, '2026-10-05T03:00:00.000Z'), e('b', 'q1', true, '2026-10-09T03:00:00.000Z')]), '2026-10-07T00:00:00.000Z');
+  assert.equal(lastTouched(deck, [e('a', 'q1', true, '2026-10-08T03:00:00.000Z')]), '2026-10-08T03:00:00.000Z');
+  assert.equal(lastTouched({ slug: 'a', questions: [] }, []), null);
 });
 
 test('summarize: 日ごとの集計は直近 days 日を古い順に並べる', () => {

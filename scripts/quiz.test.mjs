@@ -57,13 +57,13 @@ test('record は自由入力を不正解として記録する', () => {
   assert.equal(logLines(root).length, 1);
 });
 
-test('全問が待機中なら pick は空配列と理由を返す', () => {
+test('全問が時期前でも pick は問題を返し、その旨を伝える', () => {
   const root = setup();
   run(root, 'record', 'sample', 'q1', '副詞');
   run(root, 'record', 'sample', 'q2', 'phrasal verb');
   const out = JSON.parse(run(root, 'pick', 'sample').stdout);
-  assert.deepEqual(out.questions, []);
-  assert.match(out.message, /ありません/);
+  assert.equal(out.questions.length, 2);
+  assert.match(out.message, /時期前/);
 });
 
 test('壊れた行があっても pick と list は動く', () => {
@@ -84,11 +84,21 @@ test('不正なセット名・存在しないセット・存在しない問題�
   assert.ok(!existsSync(join(root, 'results', 'log.jsonl')));
 });
 
-test('list はセットと出題可能数を表示する', () => {
-  const root = setup();
-  run(root, 'record', 'sample', 'q1', '副詞');
+test('list はセッションと復習数と最終日を表示する', () => {
+  const root = setup({ sample: { ...SAMPLE, updated: '2026-10-01' } });
   const res = run(root, 'list');
-  assert.match(res.stdout, /sample\tテスト\t出題可能 1 \/ 全 2 問/);
+  assert.match(res.stdout, /^sample\tテスト\t復習 2 \/ 全 2 問\t最終 2026-10-01$/m);
+});
+
+test('list は最後に触った順に並べ、触っていないものは最後にする', () => {
+  const root = setup({
+    old: { ...SAMPLE, title: '古い', updated: '2026-01-01' },
+    fresh: { ...SAMPLE, title: '新しい', updated: '2026-09-01' },
+    none: { ...SAMPLE, title: 'なし' },
+  });
+  run(root, 'record', 'old', 'q1', '副詞');
+  const order = run(root, 'list').stdout.trim().split('\n').map((l) => l.split('\t')[0]);
+  assert.deepEqual(order, ['old', 'fresh', 'none']);
 });
 
 test('validate は index.json を書く', () => {
