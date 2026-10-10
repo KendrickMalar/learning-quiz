@@ -29,8 +29,12 @@ learning-quiz/
 │   └── <slug>.json            問題セット（1ファイル1テーマ）
 ├── results/log.jsonl          回答記録（追記のみ）
 ├── scripts/
+│   ├── core.mjs               検査・出題選び・判定（純粋関数）
+│   ├── stats.mjs              記録の読み込みと集計（Node と成績ページで共用）
 │   ├── quiz.mjs               CLI（依存なし、Node 標準のみ）
-│   └── quiz.test.mjs          node --test 用テスト
+│   └── *.test.mjs             node --test 用テスト
+├── package.json               npm test のみ
+├── .nojekyll                  GitHub Pages で Jekyll を通さない
 ├── .claude/skills/
 │   ├── quiz/SKILL.md          「クイズして」の手順
 │   └── make-quiz/SKILL.md     「問題作って」の手順
@@ -60,7 +64,8 @@ learning-quiz/
 
 - `slug` は英小文字・数字・ハイフン。ファイル名がセットの ID になる
 - `id` はセット内で一意。一度記録された ID は変えない（記録と紐づくため）
-- `choices` は2〜4個。`answer` は正解の 0 始まりの添字
+- `choices` は2〜4個、重複なし、1つ40文字以内（スマホの選択肢ボタンに収めるため）。`answer` は正解の 0 始まりの添字
+- `explanation` は必須
 - 問題を消すときは、記録と矛盾しないよう ID を再利用しない
 
 ### 回答記録 `results/log.jsonl`
@@ -68,8 +73,11 @@ learning-quiz/
 1回答1行。
 
 ```json
-{"ts":"2026-10-10T12:34:56+09:00","deck":"english-pos","id":"q001","correct":true}
+{"ts":"2026-10-10T03:34:56.000Z","deck":"english-pos","id":"q001","correct":true}
 ```
+
+- `ts` は UTC の ISO 8601。日付の区切りは成績ページ側で端末の時刻帯に合わせる
+- 空行・壊れた行は読み飛ばす
 
 ## CLI `scripts/quiz.mjs`
 
@@ -78,10 +86,11 @@ learning-quiz/
 | `list` | 問題セットの一覧と、各セットの出題可能数（期限が来た問題の数） | テキスト |
 | `pick <slug> [n=5]` | 出題する問題を最大 n 問選び、選択肢をシャッフルして返す | JSON |
 | `record <slug> <id> <choice-text>` | 選んだ選択肢の文字列で正誤を判定し、記録に1行追記 | JSON（正誤・正解・解説） |
-| `validate [slug]` | 問題セットの形式を検査し、`quizzes/index.json` を更新 | テキスト。不正なら終了コード1 |
+| `validate` | 全問題セットの形式を検査し、すべて正しければ `quizzes/index.json` を更新 | テキスト。不正なら終了コード1 |
 
 - `pick` の出力には正解の位置を含めない（Claude が出題時に正解を漏らさないため）
-- `record` は添字ではなく選択肢の文字列で判定する（シャッフル後の位置に依存しないため）
+- `record` は添字ではなく選択肢の文字列で判定する（シャッフル後の位置に依存しないため）。引数が空白で分かれても結合して扱う
+- 存在しないセット・不正なセット名・存在しない問題 ID は、理由を表示して終了コード1
 
 ### 出題の優先順位
 
@@ -116,7 +125,8 @@ learning-quiz/
 ## 成績ページ `index.html`
 
 - `quizzes/index.json`、各セット、`results/log.jsonl` を fetch して表示する
-- 表示内容: セットごとの正答率と回答数、日ごとの回答数と正答率の推移、間違いの多い問題（上位10件）
+- 表示内容: セットごとの正答率と回答数、日ごとの回答数と正答率の推移（直近14日）、間違いの多い問題（上位10件）
+- 削除された問題の記録は「間違いの多い問題」に出さない
 - スマホ幅で見やすいレイアウト。外部ライブラリは使わない
 
 ## テスト
