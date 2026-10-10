@@ -1,0 +1,2 @@
+# 複数の端末から追記しても、両方の行を残してマージする
+results/log.jsonl merge=union

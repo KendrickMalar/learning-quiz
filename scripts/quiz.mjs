@@ -27,18 +27,27 @@ function readDeckFile(slug) {
   return JSON.parse(readFileSync(join(QUIZ_DIR, `${slug}.json`), 'utf8'));
 }
 
-function loadDeck(slug) {
-  if (!SLUG_RE.test(slug ?? '')) fail(`セット名が不正です: ${slug ?? '（なし）'}`);
-  if (!existsSync(join(QUIZ_DIR, `${slug}.json`))) fail(`問題セットが見つかりません: ${slug}（list で一覧を確認してください）`);
+// 読めないときは理由の文字列を投げる
+function readValidDeck(slug) {
+  if (!SLUG_RE.test(slug ?? '')) throw new Error(`セット名が不正です: ${slug ?? '（なし）'}`);
+  if (!existsSync(join(QUIZ_DIR, `${slug}.json`))) throw new Error(`問題セットが見つかりません: ${slug}（list で一覧を確認してください）`);
   let deck;
   try {
     deck = readDeckFile(slug);
   } catch (e) {
-    fail(`${slug}.json を読めません: ${e.message}`);
+    throw new Error(`${slug}.json を読めません: ${e.message}`);
   }
   const errors = validateDeck(deck);
-  if (errors.length) fail(`${slug}.json の形式が不正です:\n  ${errors.join('\n  ')}`);
+  if (errors.length) throw new Error(`${slug}.json の形式が不正です:\n  ${errors.join('\n  ')}`);
   return deck;
+}
+
+function loadDeck(slug) {
+  try {
+    return readValidDeck(slug);
+  } catch (e) {
+    fail(e.message);
+  }
 }
 
 function readLog() {
@@ -50,7 +59,13 @@ function list() {
   if (slugs.length === 0) return console.log('問題セットがありません');
   const entries = readLog();
   for (const slug of slugs) {
-    const deck = loadDeck(slug);
+    let deck;
+    try {
+      deck = readValidDeck(slug);
+    } catch (e) {
+      console.error(`（飛ばしました）${e.message}`);
+      continue;
+    }
     console.log(`${slug}\t${deck.title}\t出題可能 ${countAvailable(deck, slug, entries)} / 全 ${deck.questions.length} 問`);
   }
 }
@@ -75,7 +90,9 @@ function record(slug, id, choiceParts) {
     fail(e.message);
   }
   mkdirSync(dirname(LOG_PATH), { recursive: true });
-  appendFileSync(LOG_PATH, JSON.stringify({ ts: new Date().toISOString(), deck: slug, id, correct: result.correct }) + '\n');
+  // 手での編集やコンフリクト解決で末尾の改行が消えていても、行がくっつかないようにする
+  const needsNewline = existsSync(LOG_PATH) && !/(^|\n)$/.test(readFileSync(LOG_PATH, 'utf8'));
+  appendFileSync(LOG_PATH, (needsNewline ? '\n' : '') + JSON.stringify({ ts: new Date().toISOString(), deck: slug, id, correct: result.correct }) + '\n');
   console.log(JSON.stringify(result));
 }
 

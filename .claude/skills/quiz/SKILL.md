@@ -9,6 +9,7 @@ description: 「クイズして」「クイズ出して」「復習したい」�
 
 ## 手順
 
+0. 最新の記録を取り込む: `git pull --rebase`（失敗したら理由を伝え、そのまま出題を続ける）
 1. セットを決める
    - 指定がなければ `node scripts/quiz.mjs list` を実行し、AskUserQuestion でセットを選んでもらう（選択肢は4つまで。多ければ出題可能数の多い順に4つ）
 2. `node scripts/quiz.mjs pick <slug> [問題数]` を実行する。問題数の指定がなければ 5
@@ -26,5 +27,5 @@ description: 「クイズして」「クイズ出して」「復習したい」�
    git commit -m "quiz: <slug> N問中M問正解"
    git push
    ```
-   - push に失敗したら、その旨と理由を伝える（commit は残す）
+   - push が拒否されたら `git pull --rebase && git push` を1回だけ試す。それでも失敗したら、その旨と理由を伝える（commit は残す）
 6. 途中で「やめる」と言われたら、そこまでの記録を手順5と同じく commit・push する

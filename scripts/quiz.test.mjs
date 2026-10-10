@@ -106,3 +106,22 @@ test('validate は不正なセットがあれば終了コード1で index.json �
   assert.match(res.stderr, /bad\.json/);
   assert.ok(!existsSync(join(root, 'quizzes', 'index.json')));
 });
+
+test('record は末尾に改行のない記録にも行を分けて追記する', () => {
+  const root = setup();
+  mkdirSync(join(root, 'results'));
+  writeFileSync(join(root, 'results', 'log.jsonl'), '{"ts":"2026-10-10T03:00:00.000Z","deck":"sample","id":"q1","correct":true}');
+  run(root, 'record', 'sample', 'q2', '名詞');
+  assert.deepEqual(logLines(root).map((e) => e.id), ['q1', 'q2']);
+});
+
+test('list は壊れたセットを警告して飛ばし、ほかのセットを表示する', () => {
+  const root = setup();
+  writeFileSync(join(root, 'quizzes', 'broken.json'), '{ not json');
+  writeFileSync(join(root, 'quizzes', 'My.json'), JSON.stringify(SAMPLE));
+  const res = run(root, 'list');
+  assert.equal(res.status, 0, res.stderr);
+  assert.match(res.stdout, /^sample\t/m);
+  assert.match(res.stderr, /broken/);
+  assert.match(res.stderr, /My/);
+});
