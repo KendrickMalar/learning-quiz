@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学習クイズの成績</title>
+<style>
+  :root { --bg: #fafaf7; --fg: #1d1d1b; --muted: #6b6b66; --line: #e3e2dc; --bar: #3a7d5c; --bar-bg: #e8efe9; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --fg: #ecebe6; --muted: #9a9993; --line: #2c2c2a; --bar: #5fb38a; --bar-bg: #23302a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Hiragino Sans", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 32px 0 8px; }
+  .note, .empty, .sub { color: var(--muted); }
+  .note { font-size: .85rem; margin: 0; }
+  .sub { font-size: .8rem; }
+  .row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .row-head { display: flex; justify-content: space-between; gap: 12px; }
+  .row-head span:first-child { overflow-wrap: anywhere; }
+  .row-head span:last-child { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .bar { height: 6px; background: var(--bar-bg); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--bar); }
+</style>
+</head>
+<body>
+<main>
+  <h1>学習クイズの成績</h1>
+  <p class="note" id="summary">読み込み中…</p>
+  <h2>セット別</h2>
+  <div id="decks"></div>
+  <h2>直近14日</h2>
+  <div id="daily"></div>
+  <h2>間違いの多い問題</h2>
+  <div id="weak"></div>
+</main>
+<script type="module">
+  import { parseLog, summarize } from './scripts/stats.mjs';
+
+  async function fetchText(path) {
+    const res = await fetch(path, { cache: 'no-store' });
+    return res.ok ? res.text() : null;
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function row(label, value, ratio, sub) {
+    const r = el('div', 'row');
+    const head = el('div', 'row-head');
+    head.append(el('span', '', label), el('span', '', value));
+    r.append(head);
+    if (sub) r.append(el('div', 'sub', sub));
+    if (ratio !== null) {
+      const bar = el('div', 'bar');
+      const fill = el('div');
+      fill.style.width = `${Math.round(ratio * 100)}%`;
+      bar.append(fill);
+      r.append(bar);
+    }
+    return r;
+  }
+
+  const pct = (correct, answered) => (answered ? `${Math.round((correct / answered) * 100)}%` : '—');
+
+  function fill(id, rows, emptyText) {
+    const box = document.getElementById(id);
+    box.replaceChildren(...(rows.length ? rows : [el('p', 'empty', emptyText)]));
+  }
+
+  async function main() {
+    const index = JSON.parse((await fetchText('quizzes/index.json')) ?? '[]');
+    const decks = [];
+    for (const item of index) {
+      const text = await fetchText(`quizzes/${item.slug}.json`);
+      if (text) decks.push({ ...JSON.parse(text), slug: item.slug });
+    }
+    const entries = parseLog((await fetchText('results/log.jsonl')) ?? '');
+    const { perDeck, daily, weak } = summarize(decks, entries);
+
+    document.getElementById('summary').textContent = `${decks.length} セット・回答 ${entries.length} 件`;
+    fill('decks', perDeck.map((d) =>
+      row(d.title, `${pct(d.correct, d.answered)}（${d.correct}/${d.answered}）`, d.answered ? d.rate : null)), 'まだ問題セットがありません');
+    const max = Math.max(1, ...daily.map((d) => d.answered));
+    fill('daily', daily.slice().reverse().map((d) =>
+      row(d.date, d.answered ? `${d.answered}問・正答率 ${pct(d.correct, d.answered)}` : '0問', d.answered / max)), '');
+    fill('weak', weak.map((w) => row(w.question, `${w.wrong}/${w.total} 回ミス`, null, w.title)), 'まだ間違えた問題はありません');
+  }
+
+  main().catch((e) => {
+    document.getElementById('summary').textContent = `読み込みに失敗しました: ${e.message}`;
+  });
+</script>
+</body>
+</html>
