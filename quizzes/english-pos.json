@@ -1,0 +1,11 @@
+{
+  "title": "英語の品詞",
+  "source": "自作（基本的な英文法）",
+  "questions": [
+    { "id": "q001", "question": "\"quickly\" の品詞は？", "choices": ["名詞", "動詞", "形容詞", "副詞"], "answer": 3, "explanation": "動詞を修飾する -ly の語なので副詞。" },
+    { "id": "q002", "question": "\"happiness\" の品詞は？", "choices": ["名詞", "動詞", "形容詞", "副詞"], "answer": 0, "explanation": "-ness は形容詞を名詞にする接尾辞。" },
+    { "id": "q003", "question": "\"beautiful\" の品詞は？", "choices": ["名詞", "動詞", "形容詞", "副詞"], "answer": 2, "explanation": "-ful は名詞を形容詞にする接尾辞。" },
+    { "id": "q004", "question": "\"decide\" の品詞は？", "choices": ["名詞", "動詞", "形容詞", "副詞"], "answer": 1, "explanation": "名詞形は decision、形容詞形は decisive。" },
+    { "id": "q005", "question": "\"friendly\" の品詞は？", "choices": ["名詞", "動詞", "形容詞", "副詞"], "answer": 2, "explanation": "-ly だが名詞 friend に付いた形容詞。副詞と間違えやすい。" }
+  ]
+}
