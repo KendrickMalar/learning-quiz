@@ -1,0 +1,7 @@
+{
+  "name": "learning-quiz",
+  "private": true,
+  "scripts": {
+    "test": "node --test \"scripts/*.test.mjs\""
+  }
+}
